@@ -2,16 +2,12 @@ package main
 
 import (
     "fmt"
+    "math"
     "math/rand"
     "time"
 )
 
 const BrailleBase = 0x2800
-
-const NRows = 80
-const NCols = 100
-const NTextRows = NRows / 4
-const NTextCols = NCols / 2
 
 func coordToBrailleIndex(row, col int) int {
     if row == 0 {
@@ -21,21 +17,21 @@ func coordToBrailleIndex(row, col int) int {
     }
 }
 
-func renderPixelsToBraille(pixels *[NRows][NCols]bool, textBuf *[NTextRows][NTextCols]rune) {
-    for i := range pixels {
-        for j, pixel := range pixels[i] {
-            textBuf[i / 4][j / 2] &= ^(1 << coordToBrailleIndex(j % 2, i % 4))
+func renderPixelsToBraille(pixels *[][]bool, textBuf *[][]rune) {
+    for i := range *pixels {
+        for j, pixel := range (*pixels)[i] {
+            (*textBuf)[i / 4][j / 2] &= ^(1 << coordToBrailleIndex(j % 2, i % 4))
             if pixel {
-                textBuf[i / 4][j / 2] |= (1 << coordToBrailleIndex(j % 2, i % 4))
+                (*textBuf)[i / 4][j / 2] |= (1 << coordToBrailleIndex(j % 2, i % 4))
             }
         }
     }
 }
 
-func printTextBuffer(textBuf *[NTextRows][NTextCols]rune) {
-    for i := range textBuf {
-        for j := range textBuf[i] {
-            fmt.Print(string(textBuf[i][j]))
+func printTextBuffer(textBuf *[][]rune) {
+    for i := range *textBuf {
+        for j := range (*textBuf)[i] {
+            fmt.Print(string((*textBuf)[i][j]))
         }
         fmt.Println()
     }
@@ -45,14 +41,14 @@ func moveCursorUp(lines int) {
     fmt.Printf("\x1b[%dA", lines)
 }
 
-func nLiveNeighbors(pixels *[NRows][NCols]bool, row, col int) int {
+func nLiveNeighbors(pixels *[][]bool, row, col int) int {
     var n int
 
     yOffs := []int{0}
     if row != 0 {
         yOffs = append(yOffs, -1)
     }
-    if row != len(pixels) - 1 {
+    if row != len(*pixels) - 1 {
         yOffs = append(yOffs, 1)
     }
 
@@ -60,13 +56,13 @@ func nLiveNeighbors(pixels *[NRows][NCols]bool, row, col int) int {
     if col != 0 {
         xOffs = append(xOffs, -1)
     }
-    if col != len(pixels[0]) - 1 {
+    if col != len((*pixels)[0]) - 1 {
         xOffs = append(xOffs, 1)
     }
 
     for _, yOff := range yOffs {
         for _, xOff := range xOffs {
-            if (yOff != 0 || xOff != 0) && pixels[row + yOff][col + xOff]{
+            if (yOff != 0 || xOff != 0) && (*pixels)[row + yOff][col + xOff]{
                 n++
             }
         }
@@ -75,16 +71,21 @@ func nLiveNeighbors(pixels *[NRows][NCols]bool, row, col int) int {
     return n
 }
 
-func permuteGOL(pixels *[NRows][NCols]bool) {
-    oldPixels := *pixels
-    for row := range pixels {
-        for col := range pixels[row] {
+func permuteGOL(pixels *[][]bool) {
+    oldPixels := make([][]bool, len(*pixels))
+    for i := range *pixels {
+        oldPixels[i] = make([]bool, len((*pixels)[i]))
+        copy(oldPixels[i], (*pixels)[i])
+    }
+
+    for row := range *pixels {
+        for col := range (*pixels)[row] {
             alive := oldPixels[row][col]
             neighbors := nLiveNeighbors(&oldPixels, row, col)
 
             switch {
-            case alive && (neighbors < 2 || neighbors > 3): pixels[row][col] = false
-            case !alive && neighbors == 3: pixels[row][col] = true
+            case alive && (neighbors < 2 || neighbors > 3): (*pixels)[row][col] = false
+            case !alive && neighbors == 3: (*pixels)[row][col] = true
             }
         }
     }
@@ -93,14 +94,25 @@ func permuteGOL(pixels *[NRows][NCols]bool) {
 func main() {
     rand.Seed(time.Now().UnixNano())
 
-    var pixels [NRows][NCols]bool
+    var NRows = 80
+    var NCols = 100
+    var NTextRows = int(math.Ceil(float64(NRows) / 4.0))
+    var NTextCols = int(math.Ceil(float64(NCols) / 2.0))
+
+    pixels := make([][]bool, NRows)
+    for i := range pixels {
+        pixels[i] = make([]bool, NCols)
+    }
     for row := range pixels {
         for col := range pixels[row] {
             pixels[row][col] = rand.Intn(2) == 1
         }
     }
 
-    var textBuf [NTextRows][NTextCols]rune
+    textBuf := make([][]rune, NTextRows)
+    for i := range textBuf {
+        textBuf[i] = make([]rune, NTextCols)
+    }
     for row := range textBuf {
         for col := range textBuf[row] {
             textBuf[row][col] = BrailleBase
