@@ -6,6 +6,7 @@ import (
 	"math"
 	"math/rand"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,16 @@ func printTextBuffer(textBuf *[][]rune) {
 		}
 		fmt.Println()
 	}
+}
+
+func setCursorVisible(visible bool) {
+	var command rune
+	if visible {
+		command = 'h'
+	} else {
+		command = 'l'
+	}
+	fmt.Printf("\x1b[?25%c", command)
 }
 
 func moveCursorUp(lines int) {
@@ -109,7 +120,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	size := flag.String("size", "100x80", "the size of the game board, <width>x<height>")
-	tickInt := flag.Int("tick", 100, "the time between ticks (in milliseconds)")
+	tickInt := flag.Int("tick", 50, "the time between ticks (in milliseconds)")
 	flag.Parse()
 	tick := time.Duration(*tickInt)
 
@@ -147,6 +158,17 @@ func main() {
 		}
 	}
 
+	// When the user terminates the process, show the cursor
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for range c {
+			setCursorVisible(true)
+			os.Exit(0)
+		}
+	}()
+
+	setCursorVisible(false)
 	for {
 		renderPixelsToBraille(&pixels, &textBuf)
 		printTextBuffer(&textBuf)
