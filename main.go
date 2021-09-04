@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"math"
 	"math/rand"
@@ -10,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pborman/getopt/v2"
 )
 
 const BrailleBase = 0x2800
@@ -119,9 +120,9 @@ func permuteGOL(pixels *[][]bool) {
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
-	size := flag.String("size", "100x80", "the size of the game board, <width>x<height>")
-	tickInt := flag.Int("tick", 50, "the time between ticks (in milliseconds)")
-	flag.Parse()
+	size := getopt.StringLong("size", 's', "100x80", "the size of the game board, <width>x<height>")
+	tickInt := getopt.IntLong("tick", 't', 50, "the time between ticks (in milliseconds)")
+	getopt.Parse()
 	tick := time.Duration(*tickInt)
 
 	sizeSplit := strings.Split(*size, "x")
