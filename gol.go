@@ -41,6 +41,14 @@ func moveCursorUp(lines int) {
     fmt.Printf("\x1b[%dA", lines)
 }
 
+func randomizePixels(pixels *[][]bool) {
+    for row := range *pixels {
+        for col := range (*pixels)[row] {
+            (*pixels)[row][col] = rand.Intn(2) == 1
+        }
+    }
+}
+
 func nLiveNeighbors(pixels *[][]bool, row, col int) int {
     var n int
 
@@ -103,17 +111,11 @@ func main() {
     for i := range pixels {
         pixels[i] = make([]bool, NCols)
     }
-    for row := range pixels {
-        for col := range pixels[row] {
-            pixels[row][col] = rand.Intn(2) == 1
-        }
-    }
+    randomizePixels(&pixels)
 
     textBuf := make([][]rune, NTextRows)
-    for i := range textBuf {
-        textBuf[i] = make([]rune, NTextCols)
-    }
     for row := range textBuf {
+        textBuf[row] = make([]rune, NTextCols)
         for col := range textBuf[row] {
             textBuf[row][col] = BrailleBase
         }
