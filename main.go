@@ -109,7 +109,9 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	size := flag.String("size", "100x80", "the size of the game board, <width>x<height>")
+	tickInt := flag.Int("tick", 100, "the time between ticks (in milliseconds)")
 	flag.Parse()
+	tick := time.Duration(*tickInt)
 
 	sizeSplit := strings.Split(*size, "x")
 	const sizeParseError = "size must be in the form <width>x<height>"
@@ -151,7 +153,7 @@ func main() {
 
 		permuteGOL(&pixels)
 
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(tick * time.Millisecond)
 		moveCursorUp(len(textBuf))
 	}
 }
