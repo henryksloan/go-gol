@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/eiannone/keyboard"
 	"github.com/pborman/getopt/v2"
 )
 
@@ -235,10 +236,19 @@ func main() {
 		}
 	}()
 
-	getCharChan := make(chan rune, 1)
+	keyChan := make(chan struct {
+		rune
+		keyboard.Key
+	}, 1)
 	go func() {
 		for {
-			getCharChan <- rune(Getch())
+			char, key, err := keyboard.GetSingleKey()
+			if err == nil {
+				keyChan <- struct {
+					rune
+					keyboard.Key
+				}{char, key}
+			}
 		}
 	}()
 
@@ -249,7 +259,9 @@ func main() {
 	charLoop:
 		for {
 			select {
-			case char := <-getCharChan:
+			case press := <-keyChan:
+				char := press.rune
+				key := press.Key
 				switch char {
 				case 'q':
 					exit()
@@ -260,15 +272,22 @@ func main() {
 					if pause {
 						redrawTextBuffer(&pixels, &textBuf, pauseCursorX, pauseCursorY)
 					}
-				case ' ':
-					if pause {
-						pause = false
-						moveCursor(-pauseCursorY, -pauseCursorX)
-					} else {
-						pause = true
-						moveCursor(pauseCursorY, pauseCursorX)
+				}
+
+				if char == 0 {
+					switch key {
+					case keyboard.KeyCtrlC:
+						exit()
+					case keyboard.KeySpace:
+						if pause {
+							pause = false
+							moveCursor(-pauseCursorY, -pauseCursorX)
+						} else {
+							pause = true
+							moveCursor(pauseCursorY, pauseCursorX)
+						}
+						setCursorVisible(pause)
 					}
-					setCursorVisible(pause)
 				}
 
 				if pause {
