@@ -1,5 +1,34 @@
 package main
 
+/*
+#ifdef _WIN32
+#include<conio.h>
+#endif
+
+#ifdef linux
+#include <stdio.h>
+#include <unistd.h>
+#include <termios.h>
+char getch(){
+    char ch = 0;
+    struct termios old = {0};
+    fflush(stdout);
+    if( tcgetattr(0, &old) < 0 ) perror("tcsetattr()");
+    old.c_lflag &= ~ICANON;
+    old.c_lflag &= ~ECHO;
+    old.c_cc[VMIN] = 1;
+    old.c_cc[VTIME] = 0;
+    if( tcsetattr(0, TCSANOW, &old) < 0 ) perror("tcsetattr ICANON");
+    if( read(0, &ch,1) < 0 ) perror("read()");
+    old.c_lflag |= ICANON;
+    old.c_lflag |= ECHO;
+    if(tcsetattr(0, TCSADRAIN, &old) < 0) perror("tcsetattr ~ICANON");
+    return ch;
+}
+#endif
+*/
+import "C"
+
 import (
 	"fmt"
 	"math"
@@ -117,6 +146,11 @@ func permuteGOL(pixels *[][]bool) {
 	}
 }
 
+func exit() {
+	setCursorVisible(true)
+	os.Exit(0)
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
@@ -160,23 +194,43 @@ func main() {
 	}
 
 	// When the user terminates the process, show the cursor
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
 	go func() {
-		for range c {
-			setCursorVisible(true)
-			os.Exit(0)
+		for range signalChan {
+			exit()
 		}
 	}()
 
+	getCharChan := make(chan rune, 1)
+	go func() {
+		for {
+			getCharChan <- rune(C.getch())
+		}
+	}()
+
+	pause := false
 	setCursorVisible(false)
 	for {
-		renderPixelsToBraille(&pixels, &textBuf)
-		printTextBuffer(&textBuf)
+		select {
+		case char := <-getCharChan:
+			switch char {
+			case 27: // Escape key
+				exit()
+			case ' ':
+				pause = !pause
+			}
+		default:
+		}
 
-		permuteGOL(&pixels)
+		if !pause {
+			renderPixelsToBraille(&pixels, &textBuf)
+			printTextBuffer(&textBuf)
 
-		time.Sleep(tick * time.Millisecond)
-		moveCursorUp(len(textBuf))
+			permuteGOL(&pixels)
+
+			time.Sleep(tick * time.Millisecond)
+			moveCursorUp(len(textBuf))
+		}
 	}
 }
