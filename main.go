@@ -164,8 +164,14 @@ func main() {
 
 	size := getopt.StringLong("size", 's', "100x80", "the size of the game board, <width>x<height>")
 	tickInt := getopt.IntLong("tick", 't', 50, "the time between ticks (in milliseconds)")
-	noNumpad := getopt.BoolLong("no-numpad", 'n', "turn on cell toggling key bindings that don't require a numpad")
+	noNumpad := getopt.BoolLong("no-numpad", 'n', "turn on key bindings that don't require a numpad")
+	help := getopt.BoolLong("help", 'h', "show this message")
 	getopt.Parse()
+
+	if *help {
+		getopt.Usage()
+		return
+	}
 
 	tick := time.Duration(*tickInt)
 
