@@ -266,6 +266,14 @@ func main() {
 				}
 
 				if pause {
+					for row := range cellToggleKeys {
+						for col, key := range cellToggleKeys[row] {
+							if char == key {
+								togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, row, col)
+							}
+						}
+					}
+
 					switch char {
 					case 'k':
 						if pauseCursorY > 0 {
@@ -287,23 +295,6 @@ func main() {
 							pauseCursorX -= 1
 							moveCursor(0, -1)
 						}
-
-					case cellToggleKeys[0][0]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 0, 0)
-					case cellToggleKeys[0][1]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 0, 1)
-					case cellToggleKeys[1][0]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 1, 0)
-					case cellToggleKeys[1][1]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 1, 1)
-					case cellToggleKeys[2][0]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 2, 0)
-					case cellToggleKeys[2][1]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 2, 1)
-					case cellToggleKeys[3][0]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 3, 0)
-					case cellToggleKeys[3][1]:
-						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 3, 1)
 
 					case '0':
 						clearUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY)
