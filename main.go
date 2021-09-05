@@ -164,8 +164,27 @@ func main() {
 
 	size := getopt.StringLong("size", 's', "100x80", "the size of the game board, <width>x<height>")
 	tickInt := getopt.IntLong("tick", 't', 50, "the time between ticks (in milliseconds)")
+	noNumpad := getopt.BoolLong("no-numpad", 'n', "turn on cell toggling key bindings that don't require a numpad")
 	getopt.Parse()
+
 	tick := time.Duration(*tickInt)
+
+	var cellToggleKeys [][]rune
+	if *noNumpad {
+		cellToggleKeys = [][]rune{
+			{'1', '2'},
+			{'3', '4'},
+			{'5', '6'},
+			{'7', '8'},
+		}
+	} else {
+		cellToggleKeys = [][]rune{
+			{'/', '*'},
+			{'8', '9'},
+			{'5', '6'},
+			{'2', '3'},
+		}
+	}
 
 	sizeSplit := strings.Split(*size, "x")
 	const sizeParseError = "size must be in the form <width>x<height>"
@@ -269,21 +288,21 @@ func main() {
 							moveCursor(0, -1)
 						}
 
-					case '/':
+					case cellToggleKeys[0][0]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 0, 0)
-					case '*':
+					case cellToggleKeys[0][1]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 0, 1)
-					case '8':
+					case cellToggleKeys[1][0]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 1, 0)
-					case '9':
+					case cellToggleKeys[1][1]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 1, 1)
-					case '5':
+					case cellToggleKeys[2][0]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 2, 0)
-					case '6':
+					case cellToggleKeys[2][1]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 2, 1)
-					case '2':
+					case cellToggleKeys[3][0]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 3, 0)
-					case '3':
+					case cellToggleKeys[3][1]:
 						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 3, 1)
 
 					case '0':
