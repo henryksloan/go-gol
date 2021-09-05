@@ -7,7 +7,7 @@ A terminal-based implementation of Conway's Game of Life using Go and Unicode br
 or use `go run . --help` to see the different options
 
 ### Controls
-Press `q` to pause/unpause the simulation  
+Press `q` to exit  
 Press `c` to clear the board  
 Press `space` to pause/unpause the simulation
 
