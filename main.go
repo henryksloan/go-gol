@@ -43,6 +43,14 @@ func printTextBuffer(textBuf *[][]rune) {
 	}
 }
 
+func redrawTextBuffer(pixels *[][]bool, textBuf *[][]rune, cursorX, cursorY int) {
+	renderPixelsToBraille(pixels, textBuf)
+	moveCursor(-cursorY, -cursorX)
+	printTextBuffer(textBuf)
+	moveCursorUp(len(*textBuf))
+	moveCursor(cursorY, cursorX)
+}
+
 func setCursorVisible(visible bool) {
 	var command rune
 	if visible {
@@ -57,12 +65,41 @@ func moveCursorUp(lines int) {
 	fmt.Printf("\x1b[%dA", lines)
 }
 
+func moveCursor(rows, cols int) {
+	if rows < 0 {
+		fmt.Printf("\x1b[%dA", -rows)
+	} else if rows > 0 {
+		fmt.Printf("\x1b[%dB", rows)
+	}
+
+	if cols < 0 {
+		fmt.Printf("\x1b[%dD", -cols)
+	} else if cols > 0 {
+		fmt.Printf("\x1b[%dC", cols)
+	}
+}
+
 func randomizePixels(pixels *[][]bool) {
 	for row := range *pixels {
 		for col := range (*pixels)[row] {
 			(*pixels)[row][col] = rand.Intn(2) == 1
 		}
 	}
+}
+
+func togglePixelUnderCursor(pixels *[][]bool, textBuf *[][]rune, cursorX, cursorY int, pixelRow, pixelCol int) {
+	pixel := &((*pixels)[cursorY*4+pixelRow][cursorX*2+pixelCol])
+	*pixel = !(*pixel)
+	redrawTextBuffer(pixels, textBuf, cursorX, cursorY)
+}
+
+func clearUnderCursor(pixels *[][]bool, textBuf *[][]rune, cursorX, cursorY int) {
+	for pixelRow := 0; pixelRow < 4; pixelRow++ {
+		for pixelCol := 0; pixelCol < 2; pixelCol++ {
+			(*pixels)[cursorY*4+pixelRow][cursorX*2+pixelCol] = false
+		}
+	}
+	redrawTextBuffer(pixels, textBuf, cursorX, cursorY)
 }
 
 func nLiveNeighbors(pixels *[][]bool, row, col int) int {
@@ -117,13 +154,43 @@ func permuteGOL(pixels *[][]bool) {
 	}
 }
 
+func exit() {
+	setCursorVisible(true)
+	os.Exit(0)
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	size := getopt.StringLong("size", 's', "100x80", "the size of the game board, <width>x<height>")
 	tickInt := getopt.IntLong("tick", 't', 50, "the time between ticks (in milliseconds)")
+	noNumpad := getopt.BoolLong("no-numpad", 'n', "turn on key bindings that don't require a numpad")
+	help := getopt.BoolLong("help", 'h', "show this message")
 	getopt.Parse()
+
+	if *help {
+		getopt.Usage()
+		return
+	}
+
 	tick := time.Duration(*tickInt)
+
+	var cellToggleKeys [][]rune
+	if *noNumpad {
+		cellToggleKeys = [][]rune{
+			{'1', '2'},
+			{'3', '4'},
+			{'5', '6'},
+			{'7', '8'},
+		}
+	} else {
+		cellToggleKeys = [][]rune{
+			{'/', '*'},
+			{'8', '9'},
+			{'5', '6'},
+			{'2', '3'},
+		}
+	}
 
 	sizeSplit := strings.Split(*size, "x")
 	const sizeParseError = "size must be in the form <width>x<height>"
@@ -160,23 +227,98 @@ func main() {
 	}
 
 	// When the user terminates the process, show the cursor
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
 	go func() {
-		for range c {
-			setCursorVisible(true)
-			os.Exit(0)
+		for range signalChan {
+			exit()
 		}
 	}()
 
+	getCharChan := make(chan rune, 1)
+	go func() {
+		for {
+			getCharChan <- rune(Getch())
+		}
+	}()
+
+	pause := false
+	pauseCursorX, pauseCursorY := 0, 0
 	setCursorVisible(false)
 	for {
-		renderPixelsToBraille(&pixels, &textBuf)
-		printTextBuffer(&textBuf)
+	charLoop:
+		for {
+			select {
+			case char := <-getCharChan:
+				switch char {
+				case 'q':
+					exit()
+				case 'c':
+					for i := range pixels {
+						pixels[i] = make([]bool, nCols)
+					}
+					if pause {
+						redrawTextBuffer(&pixels, &textBuf, pauseCursorX, pauseCursorY)
+					}
+				case ' ':
+					if pause {
+						pause = false
+						moveCursor(-pauseCursorY, -pauseCursorX)
+					} else {
+						pause = true
+						moveCursor(pauseCursorY, pauseCursorX)
+					}
+					setCursorVisible(pause)
+				}
 
-		permuteGOL(&pixels)
+				if pause {
+					for row := range cellToggleKeys {
+						for col, key := range cellToggleKeys[row] {
+							if char == key {
+								togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, row, col)
+							}
+						}
+					}
 
-		time.Sleep(tick * time.Millisecond)
-		moveCursorUp(len(textBuf))
+					switch char {
+					case 'k':
+						if pauseCursorY > 0 {
+							pauseCursorY -= 1
+							moveCursor(-1, 0)
+						}
+					case 'j':
+						if pauseCursorY < NTextRows-1 {
+							pauseCursorY += 1
+							moveCursor(1, 0)
+						}
+					case 'l':
+						if pauseCursorX < NTextCols-1 {
+							pauseCursorX += 1
+							moveCursor(0, 1)
+						}
+					case 'h':
+						if pauseCursorX > 0 {
+							pauseCursorX -= 1
+							moveCursor(0, -1)
+						}
+
+					case '0':
+						clearUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY)
+					}
+				}
+			default:
+				break charLoop
+			}
+		}
+
+		if !pause {
+			permuteGOL(&pixels)
+
+			renderPixelsToBraille(&pixels, &textBuf)
+			printTextBuffer(&textBuf)
+
+			time.Sleep(tick * time.Millisecond)
+			moveCursorUp(len(textBuf))
+		}
 	}
 }
