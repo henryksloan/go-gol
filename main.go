@@ -1,34 +1,5 @@
 package main
 
-/*
-#ifdef _WIN32
-#include<conio.h>
-#endif
-
-#ifdef linux
-#include <stdio.h>
-#include <unistd.h>
-#include <termios.h>
-char getch(){
-    char ch = 0;
-    struct termios old = {0};
-    fflush(stdout);
-    if( tcgetattr(0, &old) < 0 ) perror("tcsetattr()");
-    old.c_lflag &= ~ICANON;
-    old.c_lflag &= ~ECHO;
-    old.c_cc[VMIN] = 1;
-    old.c_cc[VTIME] = 0;
-    if( tcsetattr(0, TCSANOW, &old) < 0 ) perror("tcsetattr ICANON");
-    if( read(0, &ch,1) < 0 ) perror("read()");
-    old.c_lflag |= ICANON;
-    old.c_lflag |= ECHO;
-    if(tcsetattr(0, TCSADRAIN, &old) < 0) perror("tcsetattr ~ICANON");
-    return ch;
-}
-#endif
-*/
-import "C"
-
 import (
 	"fmt"
 	"math"
@@ -72,6 +43,14 @@ func printTextBuffer(textBuf *[][]rune) {
 	}
 }
 
+func redrawTextBuffer(pixels *[][]bool, textBuf *[][]rune, cursorX, cursorY int) {
+	renderPixelsToBraille(pixels, textBuf)
+	moveCursor(-cursorY, -cursorX)
+	printTextBuffer(textBuf)
+	moveCursorUp(len(*textBuf))
+	moveCursor(cursorY, cursorX)
+}
+
 func setCursorVisible(visible bool) {
 	var command rune
 	if visible {
@@ -86,12 +65,41 @@ func moveCursorUp(lines int) {
 	fmt.Printf("\x1b[%dA", lines)
 }
 
+func moveCursor(rows, cols int) {
+	if rows < 0 {
+		fmt.Printf("\x1b[%dA", -rows)
+	} else if rows > 0 {
+		fmt.Printf("\x1b[%dB", rows)
+	}
+
+	if cols < 0 {
+		fmt.Printf("\x1b[%dD", -cols)
+	} else if cols > 0 {
+		fmt.Printf("\x1b[%dC", cols)
+	}
+}
+
 func randomizePixels(pixels *[][]bool) {
 	for row := range *pixels {
 		for col := range (*pixels)[row] {
 			(*pixels)[row][col] = rand.Intn(2) == 1
 		}
 	}
+}
+
+func togglePixelUnderCursor(pixels *[][]bool, textBuf *[][]rune, cursorX, cursorY int, pixelRow, pixelCol int) {
+	pixel := &((*pixels)[cursorY*4+pixelRow][cursorX*2+pixelCol])
+	*pixel = !(*pixel)
+	redrawTextBuffer(pixels, textBuf, cursorX, cursorY)
+}
+
+func clearUnderCursor(pixels *[][]bool, textBuf *[][]rune, cursorX, cursorY int) {
+	for pixelRow := 0; pixelRow < 4; pixelRow++ {
+		for pixelCol := 0; pixelCol < 2; pixelCol++ {
+			(*pixels)[cursorY*4+pixelRow][cursorX*2+pixelCol] = false
+		}
+	}
+	redrawTextBuffer(pixels, textBuf, cursorX, cursorY)
 }
 
 func nLiveNeighbors(pixels *[][]bool, row, col int) int {
@@ -205,29 +213,93 @@ func main() {
 	getCharChan := make(chan rune, 1)
 	go func() {
 		for {
-			getCharChan <- rune(C.getch())
+			getCharChan <- rune(Getch())
 		}
 	}()
 
 	pause := false
+	pauseCursorX, pauseCursorY := 0, 0
 	setCursorVisible(false)
 	for {
-		select {
-		case char := <-getCharChan:
-			switch char {
-			case 27: // Escape key
-				exit()
-			case ' ':
-				pause = !pause
+	charLoop:
+		for {
+			select {
+			case char := <-getCharChan:
+				switch char {
+				case 'q':
+					exit()
+				case 'c':
+					for i := range pixels {
+						pixels[i] = make([]bool, nCols)
+					}
+					if pause {
+						redrawTextBuffer(&pixels, &textBuf, pauseCursorX, pauseCursorY)
+					}
+				case ' ':
+					if pause {
+						pause = false
+						moveCursor(-pauseCursorY, -pauseCursorX)
+					} else {
+						pause = true
+						moveCursor(pauseCursorY, pauseCursorX)
+					}
+					setCursorVisible(pause)
+				}
+
+				if pause {
+					switch char {
+					case 'k':
+						if pauseCursorY > 0 {
+							pauseCursorY -= 1
+							moveCursor(-1, 0)
+						}
+					case 'j':
+						if pauseCursorY < NTextRows-1 {
+							pauseCursorY += 1
+							moveCursor(1, 0)
+						}
+					case 'l':
+						if pauseCursorX < NTextCols-1 {
+							pauseCursorX += 1
+							moveCursor(0, 1)
+						}
+					case 'h':
+						if pauseCursorX > 0 {
+							pauseCursorX -= 1
+							moveCursor(0, -1)
+						}
+
+					case '/':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 0, 0)
+					case '*':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 0, 1)
+					case '8':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 1, 0)
+					case '9':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 1, 1)
+					case '5':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 2, 0)
+					case '6':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 2, 1)
+					case '2':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 3, 0)
+					case '3':
+						togglePixelUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY, 3, 1)
+
+					case '0':
+						clearUnderCursor(&pixels, &textBuf, pauseCursorX, pauseCursorY)
+					}
+				}
+			default:
+				break charLoop
 			}
-		default:
 		}
 
 		if !pause {
+			permuteGOL(&pixels)
+
 			renderPixelsToBraille(&pixels, &textBuf)
 			printTextBuffer(&textBuf)
-
-			permuteGOL(&pixels)
 
 			time.Sleep(tick * time.Millisecond)
 			moveCursorUp(len(textBuf))
