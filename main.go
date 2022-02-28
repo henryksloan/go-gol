@@ -256,6 +256,9 @@ func main() {
 	pauseCursorX, pauseCursorY := 0, 0
 	setCursorVisible(false)
 	for {
+		// Indicates whether to perform a single step, even if paused
+		var doStep = false
+
 	charLoop:
 		for {
 			select {
@@ -272,6 +275,9 @@ func main() {
 					if pause {
 						redrawTextBuffer(&pixels, &textBuf, pauseCursorX, pauseCursorY)
 					}
+				case 's':
+					pause = true
+					doStep = true
 				}
 
 				if char == 0 {
@@ -330,7 +336,7 @@ func main() {
 			}
 		}
 
-		if !pause {
+		if !pause || doStep {
 			permuteGOL(&pixels)
 
 			renderPixelsToBraille(&pixels, &textBuf)

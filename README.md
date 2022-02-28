@@ -9,6 +9,7 @@ or use `go run . --help` to see the different options
 ### Controls
 Press `q` to exit  
 Press `c` to clear the board  
+Press `s` to step the simulation once
 Press `space` to pause/unpause the simulation
 
 When paused:  
